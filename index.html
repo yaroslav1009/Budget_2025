@@ -1,68 +1,207 @@
 <!doctype html>
 <html lang="uk">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Бюджет сім'ї Кісленко</title>
-    <link rel="stylesheet" href="./style.css" />
-  </head>
-  <body>
-    <div class="container">
-      <header>
-        <h1>Бюджет сімʼї Кісленко</h1>
-        <div class="small">Актуально: <span id="last-sync">—</span></div>
-      </header>
 
-      <section>
-        <div class="grid" id="categoriesGrid"></div>
-      </section>
+    <link rel="stylesheet" href="./style.css">
+</head>
 
-      <section class="card" style="margin-top:12px;">
+<body>
+
+<div class="container">
+
+    <header>
+        <div>
+            <h1>💰 Бюджет сім'ї Кісленко</h1>
+            <div class="small">
+                Останнє оновлення:
+                <span id="last-sync">—</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- ========================= -->
+    <!-- Загальний бюджет -->
+    <!-- ========================= -->
+
+    <section class="card budget-card">
+
+        <h2>Загальний бюджет місяця</h2>
+
+        <div class="budget-total">
+            50 000 ₴
+        </div>
+
+        <div class="progress-bar">
+            <div class="progress" id="totalProgress"></div>
+        </div>
+
+        <div class="budget-info">
+
+            <div>
+                <span>Витрачено</span>
+                <strong id="totalSpent">
+                    0 ₴
+                </strong>
+            </div>
+
+            <div>
+                <span>Залишилось</span>
+                <strong id="moneyLeft">
+                    50 000 ₴
+                </strong>
+            </div>
+
+        </div>
+
+    </section>
+
+    <!-- ========================= -->
+    <!-- Категорії -->
+    <!-- ========================= -->
+
+    <section style="margin-top:20px;">
+
+        <div
+            class="grid"
+            id="categoriesGrid">
+        </div>
+
+    </section>
+
+    <!-- ========================= -->
+    <!-- Додавання витрати -->
+    <!-- ========================= -->
+
+    <section
+        class="card"
+        style="margin-top:20px;">
+
         <form id="expenseForm">
-          <div class="row">
-            <select id="categorySelect" required>
-              <option value="">Оберіть категорію</option>
-            </select>
-            <input
-              id="amountInput"
-              type="number"
-              min="0"
-              step="0.01"
-              placeholder="Сума"
-              class="inputSumma"
-              required
-            />
-            <button type="submit">Підтвердити</button>
-          </div>
 
-          <div class="select" style="margin-top:6px;">
-            <input
-              id="noteInput"
-              type="text"
-              placeholder="Примітка (необов'язково)"
-              style="flex: 1"
-              class="selectInput"
-            />
-          </div>
+            <div class="row">
+
+                <select
+                    id="categorySelect"
+                    required>
+
+                    <option value="">
+                        Оберіть категорію
+                    </option>
+
+                </select>
+
+                <input
+                    id="amountInput"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Сума"
+                    required>
+
+                <button type="submit">
+                    Додати
+                </button>
+
+            </div>
+
+            <div
+                class="select"
+                style="margin-top:10px;">
+
+                <input
+                    id="noteInput"
+                    type="text"
+                    class="selectInput"
+                    placeholder="Примітка (необов'язково)">
+
+            </div>
+
         </form>
 
         <div class="history">
-            <strong>Останні операції</strong>
-            <div id="historyList"></div>
-            <button id="showAllBtn" style="    margin-top: 8px;background-color: #f0f8ff4a; color: #00000082; position: fixed; border: 1px, solid, #0000006e; right: 16px; bottom: 10px;">Показати всю історію</button>
-      </div>
-      </section>
 
-      <section style="margin-top:12px;display:flex;gap:8px;">
-        <button id="resetBtn" class="buttonReset">
-          Скинути все (local)
-        </button>
-        <div class="small" style="align-self:center;">
-          Дані зараз зберігаються локально в браузері.
+            <strong>
+                Останні операції
+            </strong>
+
+            <div id="historyList"></div>
+
+            <button
+                id="showAllBtn"
+                class="historyButton">
+
+                Показати всю історію
+
+            </button>
+
         </div>
-      </section>
+
+    </section>
+
+    <!-- ========================= -->
+    <!-- Кнопка очистки -->
+    <!-- ========================= -->
+
+    <section class="footer-buttons">
+
+        <button
+            id="resetBtn"
+            class="buttonReset">
+
+            Скинути всі дані
+
+        </button>
+
+    </section>
+
+</div>
+
+<!-- ===================================================== -->
+<!-- Popup категорії -->
+<!-- ===================================================== -->
+
+<div
+    id="categoryModal"
+    class="modal">
+
+    <div class="modal-content">
+
+        <div class="modal-header">
+
+            <h2 id="modalTitle">
+                Категорія
+            </h2>
+
+            <button
+                id="closeModal"
+                class="close-btn">
+
+                ✕
+
+            </button>
+
+        </div>
+
+        <div
+            id="modalSummary"
+            class="modal-summary">
+
+        </div>
+
+        <div
+            id="modalHistory"
+            class="modal-history">
+
+        </div>
+
     </div>
 
-    <script src="./script.js"></script>
-  </body>
+</div>
+
+<script src="./script.js"></script>
+
+</body>
 </html>

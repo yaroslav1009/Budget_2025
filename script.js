@@ -1,3 +1,9 @@
+// =========================================
+// Налаштування
+// =========================================
+
+const TOTAL_BUDGET = 50000;
+
 const CATEGORIES = [
   "Продукти та товари",
   "Побачення",
@@ -6,51 +12,18 @@ const CATEGORIES = [
   "Машина",
   "Квартира",
   "Десятина",
+  "Медицина",
+  "Подорожі",
+  "Несподівані витрати",
+  "Скарбничка",
 ];
 
-// 💰 Ліміти для кожної категорії
-const LIMITS = {
-  "Десятина": 5000,
-  "Квартира": 10000,
-  "Продукти та товари": 12000,
-  "Гроші Дружини": 6000,
-  "Гроші Чоловіка": 5000,
-  "Машина": 5000,
-  "Побачення": 3000,
-};
+const STORAGE_KEY = "kislenko_budget_v3";
 
-const STORAGE_KEY = "kislenko_budget_v2";
+// =========================================
+// DOM
+// =========================================
 
-// ===== ІНІЦІАЛІЗАЦІЯ =====
-function loadState() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    const init = {
-      totals: CATEGORIES.reduce((acc, c) => {
-        acc[c] = 0;
-        return acc;
-      }, {}),
-      history: [],
-      updatedAt: new Date().toISOString(),
-    };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(init));
-    return init;
-  }
-  try {
-    return JSON.parse(raw);
-  } catch (e) {
-    console.error(e);
-    return null;
-  }
-}
-
-function saveState(state) {
-  state.updatedAt = new Date().toISOString();
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  render();
-}
-
-// ===== UI ЕЛЕМЕНТИ =====
 const categoriesGrid = document.getElementById("categoriesGrid");
 const categorySelect = document.getElementById("categorySelect");
 const amountInput = document.getElementById("amountInput");
@@ -59,146 +32,448 @@ const expenseForm = document.getElementById("expenseForm");
 const historyList = document.getElementById("historyList");
 const lastSync = document.getElementById("last-sync");
 const resetBtn = document.getElementById("resetBtn");
+const showAllBtn = document.getElementById("showAllBtn");
 
-// === створимо новий елемент для відображення загальної суми ===
-let totalDisplay = document.getElementById("total-display");
-if (!totalDisplay) {
-  totalDisplay = document.createElement("div");
-  totalDisplay.className = "card";
-  totalDisplay.style.marginBottom = "12px";
-  totalDisplay.style.fontWeight = "600";
-  totalDisplay.style.textAlign = "center";
-  totalDisplay.style.fontSize = "1.1rem";
-  categoriesGrid.parentElement.prepend(totalDisplay);
+const totalSpentElement = document.getElementById("totalSpent");
+const moneyLeftElement = document.getElementById("moneyLeft");
+const totalProgressElement = document.getElementById("totalProgress");
+
+// Popup
+
+const categoryModal = document.getElementById("categoryModal");
+const modalTitle = document.getElementById("modalTitle");
+const modalSummary = document.getElementById("modalSummary");
+const modalHistory = document.getElementById("modalHistory");
+const closeModal = document.getElementById("closeModal");
+
+// =========================================
+// State
+// =========================================
+
+let showingAll = false;
+let currentCategory = null;
+
+// =========================================
+// LocalStorage
+// =========================================
+
+function loadState() {
+
+    const raw = localStorage.getItem(STORAGE_KEY);
+
+    if (!raw) {
+
+        const init = {
+
+            totals: {},
+
+            history: [],
+
+            updatedAt: new Date().toISOString()
+
+        };
+
+        CATEGORIES.forEach(category => {
+
+            init.totals[category] = 0;
+
+        });
+
+        localStorage.setItem(
+            STORAGE_KEY,
+            JSON.stringify(init)
+        );
+
+        return init;
+    }
+
+    try {
+
+        const state = JSON.parse(raw);
+
+        // якщо додались нові категорії
+
+        CATEGORIES.forEach(category => {
+
+            if (!(category in state.totals)) {
+
+                state.totals[category] = 0;
+
+            }
+
+        });
+
+        return state;
+
+    } catch {
+
+        localStorage.removeItem(STORAGE_KEY);
+
+        return loadState();
+
+    }
+
 }
 
-// ===== РЕНДЕР =====
+function saveState(state) {
+
+    state.updatedAt = new Date().toISOString();
+
+    localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(state)
+    );
+
+    render();
+
+}
+
+// =========================================
+// Загальний бюджет
+// =========================================
+
+function renderBudget(totals) {
+
+    const totalSpent = Object.values(totals)
+        .reduce((sum, value) => sum + Number(value), 0);
+
+    const left = TOTAL_BUDGET - totalSpent;
+
+    totalSpentElement.textContent =
+        `${totalSpent.toFixed(2)} ₴`;
+
+    moneyLeftElement.textContent =
+        `${left.toFixed(2)} ₴`;
+
+    const percent =
+        Math.min((totalSpent / TOTAL_BUDGET) * 100, 100);
+
+    totalProgressElement.style.width =
+        percent + "%";
+
+    if (percent < 70) {
+
+        totalProgressElement.style.background =
+            "#48bb78";
+
+    }
+
+    else if (percent < 90) {
+
+        totalProgressElement.style.background =
+            "#ecc94b";
+
+    }
+
+    else {
+
+        totalProgressElement.style.background =
+            "#f56565";
+
+    }
+
+}
+
+// =========================================
+// Категорії
+// =========================================
+
 function renderCategories(totals) {
-  categoriesGrid.innerHTML = "";
-  categorySelect.innerHTML = '<option value="">Оберіть категорію</option>';
 
-  let totalSpent = 0;
+    categoriesGrid.innerHTML = "";
 
-  CATEGORIES.forEach((cat) => {
-    const spent = Number(totals[cat] || 0);
-    const limit = LIMITS[cat] || 0;
-    const percent = limit ? Math.min((spent / limit) * 100, 100) : 0;
-    totalSpent += spent;
+    categorySelect.innerHTML =
+        '<option value="">Оберіть категорію</option>';
 
-    // Колір прогресу
-    let color = "#48bb78"; // зелений
-    if (percent > 90) color = "#f56565"; // червоний
-    else if (percent > 60) color = "#ecc94b"; // жовтий
+    CATEGORIES.forEach(category => {
 
-    const card = document.createElement("div");
-    card.className = "card";
-    card.innerHTML = `
-      <div class="category-name">${cat}</div>
-      <div class="amount">${spent.toFixed(2)} ₴</div>
-      <div class="small">Ліміт: ${limit.toFixed(2)} ₴</div>
-      <div class="progress-bar">
-        <div class="progress" style="width:${percent}%; background:${color}"></div>
-      </div>
-    `;
-    categoriesGrid.appendChild(card);
+        const spent =
+            Number(totals[category] || 0);
 
-    const opt = document.createElement("option");
-    opt.value = cat;
-    opt.textContent = cat;
-    categorySelect.appendChild(opt);
-  });
+        const card =
+            document.createElement("div");
 
-  // Показати загальну витрату
-  totalDisplay.textContent = `Загальні витрати: ${totalSpent.toFixed(2)} ₴`;
+        card.className = "card";
+
+        card.style.cursor = "pointer";
+
+        card.innerHTML = `
+
+            <div class="category-name">
+
+                ${category}
+
+            </div>
+
+            <div class="amount">
+
+                ${spent.toFixed(2)} ₴
+
+            </div>
+
+        `;
+
+        // відкриття popup
+
+        card.addEventListener("click", () => {
+
+            openCategory(category);
+
+        });
+
+        categoriesGrid.appendChild(card);
+
+        const option =
+            document.createElement("option");
+
+        option.value = category;
+
+        option.textContent = category;
+
+        categorySelect.appendChild(option);
+
+    });
+
 }
+
+// =========================================
+// Історія
+// =========================================
 
 function renderHistory(history) {
-  historyList.innerHTML = "";
-  const items = history.slice().reverse().slice(0, 10);
-  if (items.length === 0)
-    historyList.innerHTML = '<div class="small">Порожньо</div>';
 
-  items.forEach((h) => {
-    const d = new Date(h.at);
-    const div = document.createElement("div");
-    div.className = "hist-item";
-    div.textContent = `${d.toLocaleString()} — ${h.category} : ${Number(
-      h.amount
-    ).toFixed(2)} ₴ ${h.note ? " — " + h.note : ""}`;
-    historyList.appendChild(div);
-  });
+    historyList.innerHTML = "";
+
+    const items = showingAll
+        ? history.slice().reverse()
+        : history.slice().reverse().slice(0, 10);
+
+    if (items.length === 0) {
+
+        historyList.innerHTML =
+            '<div class="small">Поки що немає витрат</div>';
+
+        return;
+
+    }
+
+    items.forEach(item => {
+
+        const div =
+            document.createElement("div");
+
+        div.className = "hist-item";
+
+        const date =
+            new Date(item.at);
+
+        div.textContent =
+            `${date.toLocaleString()} — ${item.category} • ${Number(item.amount).toFixed(2)} ₴ ${item.note ? "• " + item.note : ""}`;
+
+        historyList.appendChild(div);
+
+    });
+
+    showAllBtn.textContent =
+        showingAll
+            ? "Показати останні 10"
+            : "Показати всю історію";
+
 }
+
+// =========================================
+// Загальний render
+// =========================================
 
 function render() {
-  const state = loadState();
-  renderCategories(state.totals);
-  renderHistory(state.history);
-  lastSync.textContent = new Date(state.updatedAt).toLocaleString();
+
+    const state =
+        loadState();
+
+    renderBudget(state.totals);
+
+    renderCategories(state.totals);
+
+    renderHistory(state.history);
+
+    lastSync.textContent =
+        new Date(state.updatedAt)
+            .toLocaleString();
+
 }
 
-// ===== ОБРОБКА ФОРМИ =====
-expenseForm.addEventListener("submit", (e) => {
-  e.preventDefault();
+// =========================================
+// Popup категорії
+// =========================================
 
-  const cat = categorySelect.value;
-  const amt = parseFloat(amountInput.value);
-  if (!cat || isNaN(amt) || amt <= 0)
-    return alert("Оберіть категорію і введіть позитивну суму.");
+function openCategory(category) {
 
-  const state = loadState();
-  state.totals[cat] = Number(
-    (Number(state.totals[cat] || 0) + amt).toFixed(2)
-  );
-  state.history.push({
-    category: cat,
-    amount: amt,
-    note: noteInput.value || "",
-    at: new Date().toISOString(),
-  });
-  saveState(state);
+    currentCategory = category;
 
-  amountInput.value = "";
-  noteInput.value = "";
+    const state = loadState();
+
+    const history = state.history.filter(item =>
+        item.category === category
+    );
+
+    const total = history.reduce((sum, item) =>
+        sum + Number(item.amount), 0);
+
+    modalTitle.textContent = category;
+
+    modalSummary.innerHTML = `
+        <div class="modal-total">
+            Загальна сума:
+            <strong>${total.toFixed(2)} ₴</strong>
+        </div>
+    `;
+
+    modalHistory.innerHTML = "";
+
+    if (history.length === 0) {
+
+        modalHistory.innerHTML =
+            `<div class="small">У цій категорії ще немає витрат.</div>`;
+
+    } else {
+
+        history
+            .slice()
+            .reverse()
+            .forEach(item => {
+
+                const div =
+                    document.createElement("div");
+
+                div.className = "hist-item";
+
+                const date =
+                    new Date(item.at);
+
+                div.innerHTML = `
+                    <strong>${Number(item.amount).toFixed(2)} ₴</strong><br>
+                    ${date.toLocaleString()}<br>
+                    ${item.note ? item.note : ""}
+                `;
+
+                modalHistory.appendChild(div);
+
+            });
+
+    }
+
+    categoryModal.classList.add("show");
+
+}
+
+// =========================================
+// Закриття popup
+// =========================================
+
+closeModal.addEventListener("click", () => {
+
+    categoryModal.classList.remove("show");
+
 });
+
+categoryModal.addEventListener("click", (e) => {
+
+    if (e.target === categoryModal) {
+
+        categoryModal.classList.remove("show");
+
+    }
+
+});
+
+// =========================================
+// Додавання витрати
+// =========================================
+
+expenseForm.addEventListener("submit", (e) => {
+
+    e.preventDefault();
+
+    const category =
+        categorySelect.value;
+
+    const amount =
+        parseFloat(amountInput.value);
+
+    if (!category) {
+
+        alert("Оберіть категорію");
+
+        return;
+
+    }
+
+    if (isNaN(amount) || amount <= 0) {
+
+        alert("Введіть правильну суму");
+
+        return;
+
+    }
+
+    const state =
+        loadState();
+
+    state.totals[category] += amount;
+
+    state.history.push({
+
+        category,
+
+        amount,
+
+        note: noteInput.value.trim(),
+
+        at: new Date().toISOString()
+
+    });
+
+    saveState(state);
+
+    amountInput.value = "";
+
+    noteInput.value = "";
+
+    categorySelect.value = "";
+
+});
+
+// =========================================
+// Історія
+// =========================================
+
+showAllBtn.addEventListener("click", () => {
+
+    showingAll = !showingAll;
+
+    render();
+
+});
+
+// =========================================
+// Скидання LocalStorage
+// =========================================
 
 resetBtn.addEventListener("click", () => {
-  if (!confirm("Скинути всі локальні дані?")) return;
-  localStorage.removeItem(STORAGE_KEY);
-  render();
+
+    const answer =
+        confirm("Видалити всі дані?");
+
+    if (!answer) return;
+
+    localStorage.removeItem(STORAGE_KEY);
+
+    render();
+
 });
 
-const showAllBtn = document.getElementById("showAllBtn");
-let showingAll = false;
+// =========================================
+// Перший запуск
+// =========================================
 
-function renderHistory(history) {
-  historyList.innerHTML = "";
-
-  // Якщо показуємо всю історію — беремо всі елементи, інакше лише останні 10
-  const items = showingAll ? history.slice().reverse() : history.slice().reverse().slice(0, 10);
-
-  if (items.length === 0) {
-    historyList.innerHTML = '<div class="small">Порожньо</div>';
-  } else {
-    items.forEach((h) => {
-      const d = new Date(h.at);
-      const div = document.createElement("div");
-      div.className = "hist-item";
-      div.textContent = `${d.toLocaleString()} — ${h.category} : ${Number(
-        h.amount
-      ).toFixed(2)} ₴ ${h.note ? " — " + h.note : ""}`;
-      historyList.appendChild(div);
-    });
-  }
-
-  // Оновлюємо текст кнопки
-  showAllBtn.textContent = showingAll ? "Показати останні 10" : "Показати всю історію";
-}
-
-// Обробник кнопки
-showAllBtn.addEventListener("click", () => {
-  showingAll = !showingAll;
-  render();
-});
-
-// ===== ПЕРШИЙ РЕНДЕР =====
 render();
